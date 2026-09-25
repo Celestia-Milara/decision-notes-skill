@@ -20,7 +20,8 @@ function run(files: Record<string, string>, args: string[] = []) {
   return { code: r.status, out: r.stdout + r.stderr };
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
-const expectCode = (files: Record<string, string>, code: string, args: string[] = []) => { const r = run(files, args); assert.match(r.out, new RegExp(`\\b${code}\\b`)); assert.equal(r.code, 1); };
+const codesIn = (out: string) => [...new Set(out.match(/\bD\d{3}\b/g) ?? [])].sort();
+const expectCode = (files: Record<string, string>, code: string, args: string[] = []) => { const r = run(files, args); assert.equal(r.code, 1, r.out); assert.deepEqual(codesIn(r.out), [code], r.out); };
 
 test("valid note and empty directory pass", () => {
   let r = run({ [`${D}2026-09-21-example.md`]: note() }); assert.equal(r.code, 0, r.out); assert.doesNotMatch(r.out, / error D/);
@@ -36,6 +37,10 @@ test("title and headers", () => {
   expectCode({ [`${D}2026-09-21-x.md`]: note().replace("Status:", "Owner: me\nStatus:") }, "D031");
   expectCode({ [`${D}2026-09-21-x.md`]: note("done") }, "D040");
   expectCode({ [`${D}2026-09-21-x.md`]: note("accepted", "") }, "D050");
+});
+test("UTF-8 BOM and CRLF notes parse", () => {
+  const r = run({ [`${D}2026-09-21-x.md`]: "\uFEFF" + note().replace(/\n/g, "\r\n") });
+  assert.equal(r.code, 0, r.out);
 });
 test("section structure and bodies", () => {
   expectCode({ [`${D}2026-09-21-x.md`]: note("accepted", undefined, body.replace("## Alternatives\n\n- **A** — useful; rejected.\n\n", "")) }, "D060");
@@ -66,7 +71,7 @@ test("links skip HTML comments and multi-backtick code spans", () => {
 });
 test("superseded fields, chains, cycles, and endpoints", () => {
   expectCode({ [`${D}2026-09-21-a.md`]: note("superseded", "") }, "D100");
-  expectCode({ [`${D}2026-09-21-a.md`]: note("accepted", "Applies-To: project-wide\nSuperseded-By: 2026-09-22-b.md\n") }, "D100");
+  expectCode({ [`${D}2026-09-21-a.md`]: note("accepted", "Applies-To: project-wide\nSuperseded-By: 2026-09-22-b.md\n"), [`${D}2026-09-22-b.md`]: note() }, "D100");
   expectCode({ [`${D}2026-09-21-a.md`]: note("superseded", "Superseded-By: nope.md\n") }, "D101");
   expectCode({ [`${D}2026-09-21-a.md`]: note("superseded", "Superseded-By: 2026-09-21-a.md\n") }, "D101");
   let r = run({ [`${D}2026-09-19-a.md`]: note("superseded", "Superseded-By: 2026-09-20-b.md\n"), [`${D}2026-09-20-b.md`]: note("superseded", "Superseded-By: 2026-09-21-c.md\n"), [`${D}2026-09-21-c.md`]: note() }); assert.equal(r.code, 0, r.out);
@@ -125,5 +130,27 @@ test("help succeeds without a decisions directory", () => {
       assert.match(r.stdout, /Usage:/);
       assert.doesNotMatch(r.stdout, /D000/);
     }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+test("file discovery uses git ls-files inside a git repository", (t) => {
+  if (spawnSync("git", ["--version"], { encoding: "utf8" }).status !== 0) return t.skip("git is not available");
+  const root = mkdtempSync(join(tmpdir(), "vd-git-"));
+  try {
+    mkdirSync(join(root, D), { recursive: true });
+    mkdirSync(join(root, "src"), { recursive: true });
+    mkdirSync(join(root, "ignored"), { recursive: true });
+    writeFileSync(join(root, D, "2026-09-21-x.md"), note());
+    writeFileSync(join(root, "src", "a.ts"), "// Decision" + ": 2026-09-22-missing.md");
+    writeFileSync(join(root, "ignored", "b.ts"), "// Decision" + ": 2026-09-23-missing.md");
+    writeFileSync(join(root, ".gitignore"), "ignored/\n");
+    for (const args of [["init", "-q"], ["add", "-A"]]) {
+      const g = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+      assert.equal(g.status, 0, g.stdout + g.stderr);
+    }
+    const r = spawnSync(process.execPath, ["--import", "tsx", SCRIPT, "--root", root], { encoding: "utf8" });
+    const out = r.stdout + r.stderr;
+    assert.equal(r.status, 1, out);
+    assert.match(out, /src\/a\.ts:1: error D110/);
+    assert.doesNotMatch(out, /ignored\/b\.ts/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

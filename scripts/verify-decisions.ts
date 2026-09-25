@@ -106,7 +106,7 @@ function verifySuperseded(n: Note, ctx: Ctx): Diagnostic[] {
 }
 function checkChains(ctx: Ctx): Diagnostic[] { const out: Diagnostic[] = [];
   for (const n of ctx.notes.values()) { if (n.status !== "superseded") continue; const seen = new Set([n.file]); let cur = n, cycle = false;
-    while (cur.status === "superseded") { const next = ctx.notes.get(target(cur) ?? ""); if (!next) break; if (seen.has(next.file)) { out.push(diag(n, "D102", "error", `supersede cycle: ${[...seen, next.file].join(" -> ")}`)); cycle = true; break; } seen.add(next.file); cur = next; }
+    while (cur.status === "superseded") { const t = target(cur); if (!t || t === cur.file || !FILE_RE.test(t) || t.includes("/")) break; const next = ctx.notes.get(t); if (!next) break; if (seen.has(next.file)) { out.push(diag(n, "D102", "error", `supersede cycle: ${[...seen, next.file].join(" -> ")}`)); cycle = true; break; } seen.add(next.file); cur = next; }
     if (!cycle && cur.status !== "superseded" && cur.status !== "accepted") out.push(diag(n, "D103", "error", `chain ends at ${cur.file} which is ${cur.status}, expected accepted`));
   } return out;
 }

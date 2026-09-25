@@ -11,7 +11,7 @@
 1. 将本仓库内容复制到目标项目根目录。
 2. 将 `AGENTS.example.md` 重命名为 `AGENTS.md`；如果项目已有 `AGENTS.md`，只合并其中的“决策笔记”段落。
 3. 根据目标项目填写 `AGENTS.md` 中的项目概况、目录和命令，删除所有占位项。
-4. 运行 `npm install` 安装校验器所需的开发依赖。
+4. 运行 `npm ci` 安装校验器所需的开发依赖（仓库内含 `package-lock.json`）。
 5. 开始开发。`.agents/decisions/` 可以保持为空，首次确有决策需要记录时再新增笔记。
 
 > 目标项目不是 Node.js 项目时，只需复制 `.agents/skills/decision-notes/` 并合并 `AGENTS.example.md` 中的接入片段。校验器是可选工具，不必为了使用 Skill 引入 Node.js。
@@ -26,6 +26,16 @@
 
 然后把 [AGENTS.example.md](AGENTS.example.md) 中的“最小接入片段”合并到目标项目的 `AGENTS.md`。
 
+## 获取方式
+
+除直接复制外，可以用 degit 拉取指定版本（不带 `.git` 历史）：
+
+```sh
+npx degit <owner>/decision-notes-skill#v1.0.0 my-templates
+```
+
+`package.json` 的 `version` 与 git tag 保持一致；接入后想跟进上游修复时，按 tag 对比差异即可。
+
 ## 仓库结构
 
 ```text
@@ -35,6 +45,8 @@
 scripts/
   verify-decisions.ts              可选的只读校验器
   verify-decisions.test.ts         校验器回归测试
+.github/workflows/verify.yml       CI：npm test 与严格校验
+.gitignore / .gitattributes        忽略依赖与缓存、统一 LF
 AGENTS.example.md                  目标项目的协作说明模板
 verify-decisions-spec.md           校验规则与维护说明
 package.json                       校验器命令与开发依赖
@@ -52,6 +64,8 @@ package.json                       校验器命令与开发依赖
 - 让决策笔记与对应代码在同一次变更中交付。
 
 决策笔记存放于 `.agents/decisions/`。格式和命名要求以 Skill 为准。
+
+当前设计面向笔记数量在 50 篇以内的仓库：检索是全目录扫描，不生成索引；超过这个规模需要先解决检索方式，而不是继续往扁平目录里堆笔记。
 
 ## 可选校验器
 
@@ -83,6 +97,8 @@ npm run verify-decisions -- --strict
 npm test
 npm run verify-decisions -- --strict
 ```
+
+CI 会在 push 和 pull request 上运行同样两条命令。
 
 修改 Skill 规则时，请同步更新校验器、测试及规范中受影响的内容。
 
