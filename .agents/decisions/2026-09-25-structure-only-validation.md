@@ -1,6 +1,6 @@
 # Decision: 校验器只校验结构与引用，不判断内容
 
-Status: proposed
+Status: accepted
 Applies-To: scripts/verify-decisions.ts, verify-decisions-spec.md, package.json
 
 ## Context
@@ -13,9 +13,7 @@ Applies-To: scripts/verify-decisions.ts, verify-decisions-spec.md, package.json
 
 ## Alternatives
 
-- **校验篇幅与"是否像工作日志"** — 看似能阻止把笔记写成流水账。未采用：行数和时态是可被机械满足的形式指标，加进来只会制造"为过校验而写"的动机，而真正的流水账只要写成四条加上正负后果就能通过。
-- **让校验脚本调用 LLM 判断理由充分性** — 看似最贴近"内容质量"这个真实目标。未采用：结果不可复现、需要网络与凭据、会让 CI 变得不可预测，并且隐式绑定到某个模型版本的行为。
-- **自动修复或生成索引** — 看似能降低维护成本。未采用：自动生成的正文不包含任何决策信息（信息只存在于作者的取舍里），而索引会变成需要与笔记同步维护的第二份真相。
+None — 这是 [自研单文件校验器](./2026-09-25-self-hosted-validator.md) 的范围边界，没有单独评估过备选方案。
 
 ## Consequences
 
