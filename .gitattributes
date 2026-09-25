@@ -1,0 +1,9 @@
+# 统一换行符，避免 Windows/macOS/Linux 之间的 CRLF 抖动。
+# 本机 Git 的 core.autocrlf=true 会把工作区改成 CRLF，提交时统一归一化为 LF。
+* text=auto eol=lf
+
+# 二进制文件不做换行转换
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary

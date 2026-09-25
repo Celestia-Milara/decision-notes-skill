@@ -1,0 +1,32 @@
+# 依赖
+node_modules/
+
+# 构建产物与缓存
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.eslintcache
+.cache/
+.turbo/
+.parcel-cache/
+
+# 日志
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 本地环境变量与密钥
+.env
+.env.*
+!.env.example
+
+# 编辑器与操作系统
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+
+# 注意：.agents/decisions/*.md 属于项目内容，必须提交，不要加入忽略规则。
