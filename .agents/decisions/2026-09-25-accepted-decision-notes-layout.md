@@ -5,7 +5,7 @@ Applies-To: .agents/skills/decision-notes/**, verify-decisions-spec.md, scripts/
 
 ## Context
 
-这套规则脱胎于一个内部项目的开发规则，本仓库是它的轻量化版本，只保留"让下一个会话不再重复踩坑"所需的最小机制。决策笔记的主要读者是下一个会话里的 Agent，而不是人：Agent 改代码前只有两个可靠的检索入口，代码里的反向指针和笔记头部的 `Applies-To` 路径。因此存放位置和命名方式直接决定了笔记能否被找到——如果 Agent 必须先猜一个目录或读懂序号才能判断相关性，检索就会退化成"随机翻阅"，等于没有检索。
+这套规则脱胎于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的开发规则（其 Agent Notes 约定见该仓库的 `.agents/notes/README.md`），本仓库是它的轻量化版本，只保留"让下一个会话不再重复踩坑"所需的最小机制。决策笔记的主要读者是下一个会话里的 Agent，而不是人：Agent 改代码前只有两个可靠的检索入口，代码里的反向指针和笔记头部的 `Applies-To` 路径。因此存放位置和命名方式直接决定了笔记能否被找到——如果 Agent 必须先猜一个目录或读懂序号才能判断相关性，检索就会退化成"随机翻阅"，等于没有检索。
 
 ## Decision
 

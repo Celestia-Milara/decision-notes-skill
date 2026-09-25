@@ -5,7 +5,9 @@ Applies-To: .agents/skills/decision-notes/**, verify-decisions-spec.md, scripts/
 
 ## Context
 
-决策笔记的生命周期（`proposed` / `accepted` / `rejected` / `superseded`）是检索时最先要判断的信息：Agent 找到一篇相关笔记后，紧接着要问的就是"它现在还有效吗"。状态只写在头部字段里时，只有打开文件才能知道；而 `ls` 一个目录、或在编辑器的文件树里扫一眼，看不到任何生命周期信息。上游的 DeepSeek Harness 把生命周期做成目录层级（`.agents/notes/{lifecycle}/{class}/...`）并用 gate 强制它与头部一致；本 skill 明确禁止子目录，因此只能把同一个信息压进文件名。
+决策笔记的生命周期（`proposed` / `accepted` / `rejected` / `superseded`）是检索时最先要判断的信息：Agent 找到一篇相关笔记后，紧接着要问的就是"它现在还有效吗"。状态只写在头部字段里时，只有打开文件才能知道；而 `ls` 一个目录、或在编辑器的文件树里扫一眼，看不到任何生命周期信息。上游 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 把生命周期做成目录层级（`.agents/notes/{lifecycle}/{class}/...`）并用 gate 强制它与头部一致（见该仓库 `.agents/notes/README.md`）；本 skill 明确禁止子目录，因此只能把同一个信息压进文件名。
+
+状态词与头部互为校验的思路也来自它——那份 gate 同时挡住了"改了头部忘改名"和"改了名忘改头部"，本仓库用 D022 做同一件事。
 
 ## Decision
 
