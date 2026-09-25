@@ -73,7 +73,7 @@ rg -il --hidden --no-ignore -e "src/worker" -e "worker" -e "ipc" .agents/decisio
 
 ## 4. 笔记格式
 
-文件名 `YYYY-MM-DD-short-topic.md`,日期是首次创建日(在 bash 用 `date +%F`,在 PowerShell 用 `Get-Date -Format yyyy-MM-dd`,不要凭印象),主题用小写英文 kebab-case,描述决策主题而不是任务本身。
+文件名 `YYYY-MM-DD-<status>-short-topic.md`。日期是首次创建日(在 bash 用 `date +%F`,在 PowerShell 用 `Get-Date -Format yyyy-MM-dd`,不要凭印象),状态词是 `proposed` / `accepted` / `rejected` / `superseded` 之一,主题用小写英文 kebab-case,描述决策主题而不是任务本身。状态词必须与头部 `Status` 完全一致(校验器 D022 强制),因为它让目录列表本身就能读出每篇笔记的生命周期;两者不一致时以修正文件名为准,不要只改头部。状态变化就是一次重命名——改完必须回头修掉所有指向旧文件名的地方:`Superseded-By`、正文相对链接、代码里的 `Decision:` 反向指针,校验器的 D090 / D101 / D110 会报出漏改的。
 
 ```markdown
 # Decision: <标题>
@@ -102,7 +102,7 @@ Applies-To: src/worker/**, src/ipc/protocol.ts
 
 头部字段:
 
-- `Status`:必填,取值 `proposed` / `accepted` / `rejected` / `superseded`。
+- `Status`:必填,取值 `proposed` / `accepted` / `rejected` / `superseded`,且必须与文件名里的状态词一致(D022)。
 - `Applies-To`:除 `superseded` 外必填。逗号分隔的路径或 glob(相对仓库根),全局约束写 `project-wide`。它是别的 Agent 按路径找到这篇笔记的主要入口,写宽了没用,写错了会失效,所以改文件名或移目录时要一并更新。`rejected` 也要写:填「该方案若被重新提出,会落在哪些路径」,通常是它当时瞄准的模块;仓库级选型写 `project-wide`,不要为了凑字段编一个不存在的路径。
 - `Superseded-By`:只在 `superseded` 时出现,值是同目录下的文件名。
 
@@ -128,7 +128,7 @@ Applies-To: src/worker/**, src/ipc/protocol.ts
 ```markdown
 ## Alternatives
 
-None — 遵循 [某篇已有约束笔记](./2026-08-01-example.md)。
+None — 遵循 [某篇已有约束笔记](./2026-08-01-accepted-example.md)。
 ```
 
 `None` 必须链接到一篇已有笔记,这是为了防止它成为偷懒的默认选项。
@@ -142,7 +142,7 @@ None — 遵循 [某篇已有约束笔记](./2026-08-01-example.md)。
 只在「读代码的人会觉得别扭、想简化,但其实是有意为之」的入口处,用项目语言的注释语法加一行:
 
 ```ts
-// Decision: 2026-09-21-worker-runtime-boundary.md — Worker 不直接依赖 Main Process
+// Decision: 2026-09-21-accepted-worker-runtime-boundary.md — Worker 不直接依赖 Main Process
 ```
 
 一处入口一行就够,不要到处撒。已接入的校验脚本可检查它指向的笔记是否存在。笔记被取代后,回来把注释改指向现行笔记。
@@ -158,6 +158,8 @@ None — 遵循 [某篇已有约束笔记](./2026-08-01-example.md)。
    - 方案被否决 → 改为 `rejected`。
    - 决定暂缓(用户明确暂缓,或已授权但尚未实施) → 保持 `proposed`,并在最终回复里说明暂缓原因。
    - 未获授权、或仍有必须由用户决定的取舍 → 询问。
+
+   任何状态变化都要同步重命名文件,并修掉 `Superseded-By`、正文链接和代码反向指针里指向旧文件名的地方。
 4. 笔记和代码放在**同一次提交**里。只改代码不改笔记,是笔记腐烂最常见的方式。
 5. 本次新增或修改了笔记、修改了 `Decision:` 指针,或移动/删除了笔记关联的文件时,运行项目已接入的结构校验命令。先查项目协作说明与工具配置;若采用 `npm run verify-decisions`,在项目根目录运行并读取输出。检查文件命名、字段、章节、链接及取代关系,但校验通过不代表设计理由正确,也不能替代第 1 节的约束检索。校验失败时修正实际问题,不要为通过校验填充内容。未接入校验器时,人工检查本次变更的结构和引用,并如实说明未运行自动校验;除非任务包含接入工具,不要擅自新增 npm 脚本、依赖或构建步骤。
 6. 在最终回复里用一句话说明新建或更新了哪些笔记。没有涉及笔记就不用提。

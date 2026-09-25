@@ -9,7 +9,7 @@ Applies-To: .agents/skills/decision-notes/**, verify-decisions-spec.md, scripts/
 
 ## Decision
 
-笔记集中放在仓库根的扁平目录 `.agents/decisions/`，不建子目录，并且与面向人类读者的文档隔离。文件名固定为 `YYYY-MM-DD-short-topic.md`：日期是首次创建日，主题用描述决策本身的小写英文 kebab-case。状态（`accepted` 等）由头部字段表达，不进入文件名；文件名只承载时间与主题，让目录列表本身就能读出决策随项目推进的时间线。分类职责完全交给 `Applies-To`，不由目录结构承担。
+笔记集中放在仓库根的扁平目录 `.agents/decisions/`，不建子目录，并且与面向人类读者的文档隔离。文件名固定为 `YYYY-MM-DD-<status>-short-topic.md`：日期是首次创建日，主题用描述决策本身的小写英文 kebab-case；状态词的位置与取值由 [状态词进入决策笔记文件名](./2026-09-25-accepted-status-in-filename.md) 决定，本篇只管目录形态与命名的时间维度。分类职责完全交给 `Applies-To`，不由目录结构承担。
 
 校验器把这些固化为硬约束：文件名必须匹配 `^\d{4}-\d{2}-\d{2}-...\.md$`（D020），日期必须是真实日历日期（D021），目录下出现子目录或非 `.md` 文件即报错（D010，`.gitkeep` 除外）。
 

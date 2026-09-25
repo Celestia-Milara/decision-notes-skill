@@ -13,7 +13,8 @@ type Ctx = { root: string; notes: Map<string, Note>; repoFiles: string[] };
 const STATUSES: Status[] = ["proposed", "accepted", "rejected", "superseded"];
 const HEADERS = new Set(["Status", "Applies-To", "Superseded-By"]);
 const SECTIONS = ["Context", "Decision", "Alternatives", "Consequences"];
-const FILE_RE = /^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
+// Decision: 2026-09-25-accepted-status-in-filename.md — 状态词进文件名，且必须与头部 Status 一致
+const FILE_RE = /^\d{4}-\d{2}-\d{2}-(proposed|accepted|rejected|superseded)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 const posix = (p: string) => p.split(sep).join("/");
 const diag = (n: Pick<Note, "path">, code: string, level: Level, message: string, line = 1): Diagnostic => ({ file: n.path, line, level, code, message });
 
@@ -56,9 +57,12 @@ function enumerate(root: string): { notes: Note[]; diagnostics: Diagnostic[] } {
 }
 
 function verifyFilename(n: Note): Diagnostic[] {
-  if (!FILE_RE.test(n.file)) return [diag(n, "D020", "error", "invalid decision filename")];
-  const date = n.file.slice(0, 10), d = new Date(`${date}T00:00:00Z`);
-  return Number.isNaN(+d) || d.toISOString().slice(0, 10) !== date ? [diag(n, "D021", "error", `invalid calendar date "${date}"`)] : [];
+  const m = n.file.match(FILE_RE);
+  if (!m) return [diag(n, "D020", "error", "invalid decision filename")];
+  const date = n.file.slice(0, 10), d = new Date(`${date}T00:00:00Z`), out: Diagnostic[] = [];
+  if (Number.isNaN(+d) || d.toISOString().slice(0, 10) !== date) out.push(diag(n, "D021", "error", `invalid calendar date "${date}"`));
+  if (n.status && m[1] !== n.status) out.push(diag(n, "D022", "error", `filename status "${m[1]}" does not match Status: ${n.status}`));
+  return out;
 }
 function verifyHeader(n: Note): Diagnostic[] {
   const out = [...n.parse], raw = n.header.get("Status");
@@ -122,7 +126,7 @@ function verifyApplyTo(n: Note, ctx: Ctx): Diagnostic[] { if (n.status !== "acce
 }
 function getRepoFiles(root: string): string[] { try { return execFileSync("git", ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean).map(posix); }
   catch { const out: string[] = [], skip = new Set([".git", "node_modules", "dist", "build", "coverage", ".next"]); const walk = (dir: string) => { for (const e of readdirSync(dir, { withFileTypes: true })) { if (skip.has(e.name)) continue; const p = join(dir, e.name); if (e.isDirectory()) walk(p); else out.push(posix(relative(root, p))); } }; walk(root); return out; } }
-function verifyCodeRefs(ctx: Ctx): Diagnostic[] { const out: Diagnostic[] = [], re = /Decision:\s*(?:\.{0,2}\/)?(?:\.agents\/decisions\/)?(\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*\.md)/g;
+function verifyCodeRefs(ctx: Ctx): Diagnostic[] { const out: Diagnostic[] = [], re = /Decision:\s*(?:\.{0,2}\/)?(?:\.agents\/decisions\/)?(\d{4}-\d{2}-\d{2}-(?:proposed|accepted|rejected|superseded)-[a-z0-9]+(?:-[a-z0-9]+)*\.md)/g;
   for (const file of ctx.repoFiles) { if (file.startsWith(".agents/") || /\.mdx?$/.test(file)) continue; const abs = join(ctx.root, file); try { if (!lstatSync(abs).isFile() || statSync(abs).size > 1_048_576) continue; const buf = readFileSync(abs); if (buf.subarray(0, 8192).includes(0)) continue; const text = buf.toString("utf8"), lines = text.split(/\r?\n/); lines.forEach((line, ix) => { re.lastIndex = 0; let m; while ((m = re.exec(line))) { const note = ctx.notes.get(m[1]); if (!note) out.push({ file, line: ix + 1, level: "error", code: "D110", message: `Decision reference does not exist: ${m[1]}` }); else if (note.status === "superseded" || note.status === "rejected") out.push({ file, line: ix + 1, level: "warning", code: "D111", message: `Decision reference points to ${note.status} note: ${m[1]}` }); } }); } catch { /* transient/unreadable files are ignored */ } }
   return out;
 }

@@ -13,11 +13,11 @@ Applies-To: scripts/verify-decisions.ts, verify-decisions-spec.md, package.json
 
 ## Alternatives
 
-None — 这是 [自研单文件校验器](./2026-09-25-self-hosted-validator.md) 的范围边界，没有单独评估过备选方案。
+None — 这是 [自研单文件校验器](./2026-09-25-accepted-self-hosted-validator.md) 的范围边界，没有单独评估过备选方案。
 
 ## Consequences
 
 - Positive: 校验通过不为内容质量背书，作者不需要为凑指标编造备选或代价；spec 把这条边界写成了对使用者的承诺。
 - Positive: 校验过程离线、确定、可复现，CI 的成败只取决于仓库内容，不取决于模型或网络。
 - Negative: 结构合法但内容空洞的笔记会通过，没有任何自动手段能阻止"写一篇没有信息的笔记"，只能依赖 skill 的写作规则和人工评审。
-- Negative: 不生成索引意味着检索成本随笔记数量线性增长，规模上限由 [决策笔记的存放位置](./2026-09-25-decision-notes-layout.md) 承担。
+- Negative: 不生成索引意味着检索成本随笔记数量线性增长，规模上限由 [决策笔记的存放位置](./2026-09-25-accepted-decision-notes-layout.md) 承担。
