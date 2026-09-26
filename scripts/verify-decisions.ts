@@ -147,10 +147,13 @@ function getRepoFiles(root: string): string[] { try { return execFileSync("git",
 function verifyCodeRefs(ctx: Ctx): Diagnostic[] { const out: Diagnostic[] = [], marker = /^\s*(?:(?:\/\/|#|\/\*+|\*+)\s*)?Decision:\s*(\S*)/;
   for (const file of ctx.repoFiles) { if (file.startsWith(".agents/") || /\.mdx?$/.test(file)) continue; const abs = join(ctx.root, file); try { if (!lstatSync(abs).isFile() || statSync(abs).size > 1_048_576) continue; const buf = readFileSync(abs); if (buf.subarray(0, 8192).includes(0)) continue; const text = buf.toString("utf8"), lines = text.split(/\r?\n/); lines.forEach((line, ix) => { const m = marker.exec(line); if (m) {
       const raw = m[1], ref = raw.replace(/^\.{0,2}\//, "").replace(/^\.agents\/decisions\//, "");
-      if (!raw || !FILE_RE.test(ref)) { out.push({ file, line: ix + 1, level: "error", code: "D112", message: `malformed Decision reference: ${raw || "(missing target)"}` }); continue; }
-      const note = ctx.notes.get(ref);
-      if (!note) out.push({ file, line: ix + 1, level: "error", code: "D110", message: `Decision reference does not exist: ${ref}` });
-      else if (note.status === "superseded" || note.status === "rejected") out.push({ file, line: ix + 1, level: "warning", code: "D111", message: `Decision reference points to ${note.status} note: ${ref}` });
+      if (!raw || !FILE_RE.test(ref)) {
+        out.push({ file, line: ix + 1, level: "error", code: "D112", message: `malformed Decision reference: ${raw || "(missing target)"}` });
+      } else {
+        const note = ctx.notes.get(ref);
+        if (!note) out.push({ file, line: ix + 1, level: "error", code: "D110", message: `Decision reference does not exist: ${ref}` });
+        else if (note.status === "superseded" || note.status === "rejected") out.push({ file, line: ix + 1, level: "warning", code: "D111", message: `Decision reference points to ${note.status} note: ${ref}` });
+      }
     } }); } catch { /* transient/unreadable files are ignored */ } }
   return out;
 }
