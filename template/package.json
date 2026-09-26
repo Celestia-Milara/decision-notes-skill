@@ -1,0 +1,17 @@
+{
+  "name": "decision-notes-skill",
+  "version": "1.0.0",
+  "description": "A reusable Codex skill and optional validator for repository decision notes.",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "verify-decisions": "tsx scripts/verify-decisions.ts",
+    "test": "tsx --test scripts/verify-decisions.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5"
+  }
+}

@@ -1,73 +1,56 @@
 # Decision Notes
 
-一套可直接复制进项目的 Skill，用于记录代码和测试无法表达的设计意图、架构边界、跨模块契约、重要技术选型，以及被明确否决的方案。
+用于记录代码和测试无法表达的设计意图、架构边界、跨模块契约、重要技术选型，以及被明确否决的方案。
 
 它不是 ADR 生成器，也不要求每次改动都写文档。Agent 会先检索已有约束，只在未来维护者可能误删、误改或重复讨论某项设计时维护决策笔记。
 
-## 快速开始
+这个 Skill 参考了 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Agent Notes 开发约定，是它的轻量化版本：只保留「让下一个会话不再重复踩坑」所需的最小机制，用扁平目录与文件名状态词取代上游的目录层级和强制门禁。
 
-### 方式一：复制完整模板
+设计目的是，方便小团队/多个不同agent 开发项目。
 
-1. 将本仓库内容复制到目标项目根目录。
+## Quick Start
+
+1. 将 `template/` 目录的内容复制到目标项目根目录。不要复制整个仓库：根目录还包含本仓库自用的 README、LICENSE 和自举决策笔记（见 Repository Layout）。
 2. 将 `AGENTS.example.md` 重命名为 `AGENTS.md`；如果项目已有 `AGENTS.md`，只合并其中的“决策笔记”段落。
-3. 根据目标项目填写 `AGENTS.md` 中的项目概况、目录和命令，删除所有占位项。
-4. 运行 `npm ci` 安装校验器所需的开发依赖（仓库内含 `package-lock.json`）。
+3. 根据目标项目填写 `AGENTS.md` 中的项目概况、目录和命令，只保留实际存在的条目，删除所有占位项。
+4. 运行 `npm ci` 安装校验器所需的开发依赖（`package-lock.json` 已随 `template/` 复制）。
 5. 开始开发。`.agents/decisions/` 可以保持为空，首次确有决策需要记录时再新增笔记。
 
-> 目标项目不是 Node.js 项目时，只需复制 `.agents/skills/decision-notes/` 并合并 `AGENTS.example.md` 中的接入片段。校验器是可选工具，不必为了使用 Skill 引入 Node.js。
+> 目标项目不是 Node.js 项目时，不必为了使用 Skill 引入 Node.js；可以删除 `scripts/`、`package.json` 和 `package-lock.json`，以及 `AGENTS.md` 中校验相关的条目，让 agent 阅读 [verify-decisions-spec.md](verify-decisions-spec.md) 使用项目语言生成等效的校验脚本。
 
-### 方式二：只接入 Skill
-
-复制以下目录：
+## Repository Layout
 
 ```text
-.agents/skills/decision-notes/
-```
-
-然后把 [AGENTS.example.md](AGENTS.example.md) 中的“最小接入片段”合并到目标项目的 `AGENTS.md`。
-
-## 获取方式
-
-除直接复制外，可以用 degit 拉取指定版本（不带 `.git` 历史）：
-
-```sh
-npx degit <owner>/decision-notes-skill#v1.0.0 my-templates
-```
-
-`package.json` 的 `version` 与 git tag 保持一致；接入后想跟进上游修复时，按 tag 对比差异即可。
-
-## 仓库结构
-
-```text
+template/                          新项目所需的全部文件，接入时复制这个目录
 .agents/
-  decisions/                       决策笔记目录（初始为空）
+  decisions/                       本仓库自身的决策笔记（现有 5 篇自举笔记）
   skills/decision-notes/SKILL.md   Skill 的完整工作规则
 scripts/
   verify-decisions.ts              可选的只读校验器
   verify-decisions.test.ts         校验器回归测试
-.github/workflows/verify.yml       CI：npm test 与严格校验
+.github/workflows/verify.yml       CI：npm test、严格校验与 template/ 同步检查
 .gitignore / .gitattributes        忽略依赖与缓存、统一 LF
 AGENTS.example.md                  目标项目的协作说明模板
 verify-decisions-spec.md           校验规则与维护说明
-package.json                       校验器命令与开发依赖
+package.json / package-lock.json   校验器命令与开发依赖
 ```
 
-仓库不包含业务源码、样例数据或示例决策，复制后不会把演示领域混入目标项目。
+`.agents/decisions/` 下的笔记是本仓库用自己的格式记录自己的设计决策（自举笔记），属于仓库内容而不属于模板：它们不在 `template/` 里，复制 `template/` 不会把它们带进目标项目。SKILL.md、校验器、spec、AGENTS 模板等文件在根目录与 `template/` 各有一份同步副本，修改时必须两侧同改，CI 会逐文件 diff 兜底；两个 `verify.yml` 有意相差一个同步检查步骤。
 
-## 使用方式
+## How It Works
 
-开发或评审时，Agent 按 [.agents/skills/decision-notes/SKILL.md](.agents/skills/decision-notes/SKILL.md) 执行：
+接入后无需人工参与。开发或评审时，Agent 按 [.agents/skills/decision-notes/SKILL.md](.agents/skills/decision-notes/SKILL.md) 的规则工作：
 
-- 修改已有代码前，检查全局决策、`Applies-To` 路径匹配和代码中的 `Decision:` 反向指针。
-- 区分 `proposed`、`accepted`、`rejected` 和 `superseded`，保留仍有价值的历史选择。
+- 修改已有代码前，先检索相关约束：全局决策、`Applies-To` 路径匹配、代码里的 `Decision:` 反向指针。
+- 用 `proposed` / `accepted` / `rejected` / `superseded` 四种状态区分提案、现行决策、被否决与被取代的方案，保留仍有参考价值的历史选择。
 - 只记录“为什么”和不能破坏的边界，不把笔记写成工作日志、任务清单或 PR 描述。
-- 让决策笔记与对应代码在同一次变更中交付。
+- 决策笔记与对应代码在同一次变更中交付。
 
-决策笔记存放于 `.agents/decisions/`。格式和命名要求以 Skill 为准。
+这些规则只写在 SKILL.md 一个文件里（根目录与 `template/` 各一份同步副本），项目差异放进目标项目的 `AGENTS.md` 即可；除非要改变决策笔记的格式或工作流，否则不需要修改 Skill。
 
 当前设计面向笔记数量在 50 篇以内的仓库：检索是全目录扫描，不生成索引；超过这个规模需要先解决检索方式，而不是继续往扁平目录里堆笔记。
 
-## 可选校验器
+## Using the Validator
 
 要求 Node.js 22 或更高版本：
 
@@ -85,23 +68,6 @@ npm run verify-decisions -- --strict
 
 校验器只读取文件，检查笔记结构、路径、链接、取代关系和代码反向指针，不判断技术决策本身是否正确。完整契约见 [verify-decisions-spec.md](verify-decisions-spec.md)。
 
-## 自定义
-
-通常只需修改 `AGENTS.md` 中与目标项目有关的部分。除非团队需要改变决策笔记的格式或工作流，否则不必修改 Skill。若目标项目使用其他运行时，可以依据规范重写校验器，也可以完全不接入自动校验。
-
-## 贡献
-
-提交变更前运行：
-
-```sh
-npm test
-npm run verify-decisions -- --strict
-```
-
-CI 会在 push 和 pull request 上运行同样两条命令。
-
-修改 Skill 规则时，请同步更新校验器、测试及规范中受影响的内容。
-
-## 许可证
+## License
 
 [MIT](LICENSE)

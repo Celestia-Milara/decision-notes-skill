@@ -14,13 +14,6 @@ jobs:
       # 固定到 commit SHA，避免上游 tag 被移动后执行到非预期代码。
       # checkout v4.2.2 / setup-node v4.4.0
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      # template/ 内是根目录模板文件的同步副本；verify.yml 本身有意不同步（本文件多这一步检查）。
-      - name: Check template/ mirrors are in sync
-        run: |
-          set -euo pipefail
-          for f in AGENTS.example.md verify-decisions-spec.md package.json package-lock.json .gitignore .gitattributes .agents/decisions/.gitkeep .agents/skills/decision-notes/SKILL.md scripts/verify-decisions.ts scripts/verify-decisions.test.ts; do
-            git diff --no-index --exit-code "$f" "template/$f"
-          done
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
