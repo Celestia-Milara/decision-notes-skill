@@ -91,7 +91,8 @@ test("superseded fields, chains, cycles, and endpoints", () => {
 test("code references and markdown examples", () => {
   let r = run({ [f()]: note(), "src/a.ts": "// Decision" + ": 2026-09-21-accepted-x.md" }); assert.equal(r.code, 0, r.out);
   expectCode({ [f()]: note(), "src/a.ts": "// Decision" + ": 2026-09-22-accepted-missing.md" }, "D110");
-  r = run({ [f()]: note(), "src/a.ts": "// Decision" + ": 2026-09-22-x.md" }); assert.equal(r.code, 0, r.out);
+  expectCode({ [f()]: note(), "src/a.ts": "// Decision" + ": 2026-09-22-x.md" }, "D112");
+  expectCode({ [f()]: note(), "src/a.ts": "// Decision" + ":" }, "D112");
   r = run({ [f()]: note(), "README.md": "// Decision" + ": 2026-09-22-accepted-missing.md" }); assert.equal(r.code, 0, r.out);
   r = run({ [f("superseded", "a", "2026-09-20")]: note("superseded", "Superseded-By: 2026-09-21-accepted-b.md\n"), [f("accepted", "b")]: note(), "src/a.ts": "// Decision" + ": 2026-09-20-superseded-a.md" }); assert.equal(r.code, 0, r.out); assert.match(r.out, /D111/);
 });
@@ -100,6 +101,17 @@ test("stale Applies-To and strict mode", () => {
   r = run({ [f()]: note("accepted", "Applies-To: src/missing/**\n") }, ["--strict"]); assert.equal(r.code, 1, r.out);
   r = run({ [f("proposed", "x", "2020-01-01")]: note("proposed") }); assert.equal(r.code, 0, r.out); assert.match(r.out, /D120/);
 });
+test("globstar matches whole path segments", () => {
+  let r = run({ [f()]: note("accepted", "Applies-To: src/**/worker.ts\n"), "src/worker.ts": "" }, ["--strict"]);
+  assert.equal(r.code, 0, r.out);
+  r = run({ [f()]: note("accepted", "Applies-To: src/**/worker.ts\n"), "src/nested/worker.ts": "" }, ["--strict"]);
+  assert.equal(r.code, 0, r.out);
+  r = run({ [f()]: note("accepted", "Applies-To: src/**/worker.ts\n"), "src/myworker.ts": "" }, ["--strict"]);
+  assert.equal(r.code, 1, r.out); assert.match(r.out, /D051/);
+  r = run({ [f()]: note("accepted", "Applies-To: **/worker.ts\n"), "coworker.ts": "" }, ["--strict"]);
+  assert.equal(r.code, 1, r.out); assert.match(r.out, /D051/);
+});
+
 test("unsupported glob syntax reports D052 instead of D051", () => {
   const files = { [f()]: note("accepted", "Applies-To: src/**/*.{ts,js}\n"), "src/a.ts": "" };
   let r = run(files); assert.equal(r.code, 1, r.out); assert.match(r.out, /D052/); assert.doesNotMatch(r.out, /D051/);
@@ -129,6 +141,16 @@ test("explicit root without a decisions directory reports D000", () => {
   try {
     const r = spawnSync(process.execPath, ["--import", "tsx", SCRIPT, "--root", root], { encoding: "utf8" });
     assert.equal(r.status, 1, r.stdout + r.stderr); assert.match(r.stdout, /D000/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("installed skill may omit an empty decisions directory", () => {
+  const root = mkdtempSync(join(tmpdir(), "vd-no-decisions-"));
+  try {
+    const skill = join(root, ".agents", "skills", "decision-notes", "SKILL.md");
+    mkdirSync(dirname(skill), { recursive: true }); writeFileSync(skill, "# skill\n");
+    const r = spawnSync(process.execPath, ["--import", "tsx", SCRIPT, "--root", root], { encoding: "utf8" });
+    assert.equal(r.status, 0, r.stdout + r.stderr); assert.doesNotMatch(r.stdout, /D000/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
