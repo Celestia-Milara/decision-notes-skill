@@ -44,8 +44,11 @@ function parseNote(path: string, file: string, text: string): Note {
 }
 
 function enumerate(root: string): { notes: Note[]; diagnostics: Diagnostic[] } {
-  const dir = join(root, ".agents", "decisions"), diagnostics: Diagnostic[] = [], notes: Note[] = [];
-  if (!existsSync(dir)) return { notes, diagnostics: [{ file: ".agents/decisions", line: 1, level: "error", code: "D000", message: "decision directory does not exist" }] };
+  const dir = join(root, ".agents", "decisions"), skill = join(root, ".agents", "skills", "decision-notes", "SKILL.md"), diagnostics: Diagnostic[] = [], notes: Note[] = [];
+  if (!existsSync(dir)) {
+    if (existsSync(skill)) return { notes, diagnostics };
+    return { notes, diagnostics: [{ file: ".agents/decisions", line: 1, level: "error", code: "D000", message: "decision directory is absent and decision-notes skill is not installed at .agents/skills/decision-notes/SKILL.md" }] };
+  }
   for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     const rel = `.agents/decisions/${e.name}`;
     if (e.isDirectory() || (!e.name.endsWith(".md") && e.name !== ".gitkeep")) { diagnostics.push({ file: rel, line: 1, level: "error", code: "D010", message: "decision directory must be flat and contain only .md files" }); continue; }
@@ -54,7 +57,6 @@ function enumerate(root: string): { notes: Note[]; diagnostics: Diagnostic[] } {
   }
   return { notes, diagnostics };
 }
-
 function verifyFilename(n: Note): Diagnostic[] {
   const m = n.file.match(FILE_RE);
   if (!m) return [diag(n, "D020", "error", "invalid decision filename")];
@@ -113,9 +115,26 @@ function checkChains(ctx: Ctx): Diagnostic[] { const out: Diagnostic[] = [];
     if (!cycle && cur.status !== "superseded" && cur.status !== "accepted") out.push(diag(n, "D103", "error", `chain ends at ${cur.file} which is ${cur.status}, expected accepted`));
   } return out;
 }
-function globToRegExp(glob: string): RegExp { const g = glob.replace(/^\.\//, "").replace(/\/+$/, ""); let re = "";
-  for (let i = 0; i < g.length; i++) { const c = g[i]; if (c === "*" && g[i + 1] === "*") { re += ".*"; i++; if (g[i + 1] === "/") i++; } else if (c === "*") re += "[^/]*"; else if (c === "?") re += "[^/]"; else re += c.replace(/[.+^${}()|[\]\\]/g, "\\$&"); }
-  return new RegExp(`^${re}(/.*)?$`);
+function globToRegExp(glob: string): RegExp {
+  const segments = glob.replace(/^\.\//, "").replace(/\/+$/, "").split("/");
+  const escape = (s: string) => s.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  const segment = (s: string) => {
+    let re = "";
+    for (const ch of s) re += ch === "*" ? "[^/]*" : ch === "?" ? "[^/]" : escape(ch);
+    return re;
+  };
+  let re = "";
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i], prevGlobstar = i > 0 && segments[i - 1] === "**";
+    if (s === "**") {
+      if (i > 0 && !prevGlobstar) re += "/";
+      re += i === segments.length - 1 ? ".*" : "(?:[^/]+/)*";
+    } else {
+      if (i > 0 && !prevGlobstar) re += "/";
+      re += segment(s);
+    }
+  }
+  return new RegExp(`^${re}(?:/.*)?$`);
 }
 function unsupportedGlob(p: string): boolean { return /[{}\[\]!]/.test(p); }
 function verifyApplyTo(n: Note, ctx: Ctx): Diagnostic[] { if (n.status !== "accepted") return []; const f = n.header.get("Applies-To"), pats = f?.value.split(",").map(x => x.trim()).filter(x => x && x !== "project-wide") ?? [], bad = pats.filter(unsupportedGlob), usable = pats.filter(p => !unsupportedGlob(p)), out: Diagnostic[] = [];
@@ -125,8 +144,17 @@ function verifyApplyTo(n: Note, ctx: Ctx): Diagnostic[] { if (n.status !== "acce
 }
 function getRepoFiles(root: string): string[] { try { return execFileSync("git", ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean).map(posix); }
   catch { const out: string[] = [], skip = new Set([".git", "node_modules", "dist", "build", "coverage", ".next"]); const walk = (dir: string) => { for (const e of readdirSync(dir, { withFileTypes: true })) { if (skip.has(e.name)) continue; const p = join(dir, e.name); if (e.isDirectory()) walk(p); else out.push(posix(relative(root, p))); } }; walk(root); return out; } }
-function verifyCodeRefs(ctx: Ctx): Diagnostic[] { const out: Diagnostic[] = [], re = /Decision:\s*(?:\.{0,2}\/)?(?:\.agents\/decisions\/)?(\d{4}-\d{2}-\d{2}-(?:proposed|accepted|rejected|superseded)-[a-z0-9]+(?:-[a-z0-9]+)*\.md)/g;
-  for (const file of ctx.repoFiles) { if (file.startsWith(".agents/") || /\.mdx?$/.test(file)) continue; const abs = join(ctx.root, file); try { if (!lstatSync(abs).isFile() || statSync(abs).size > 1_048_576) continue; const buf = readFileSync(abs); if (buf.subarray(0, 8192).includes(0)) continue; const text = buf.toString("utf8"), lines = text.split(/\r?\n/); lines.forEach((line, ix) => { re.lastIndex = 0; let m; while ((m = re.exec(line))) { const note = ctx.notes.get(m[1]); if (!note) out.push({ file, line: ix + 1, level: "error", code: "D110", message: `Decision reference does not exist: ${m[1]}` }); else if (note.status === "superseded" || note.status === "rejected") out.push({ file, line: ix + 1, level: "warning", code: "D111", message: `Decision reference points to ${note.status} note: ${m[1]}` }); } }); } catch { /* transient/unreadable files are ignored */ } }
+function verifyCodeRefs(ctx: Ctx): Diagnostic[] { const out: Diagnostic[] = [], marker = /^\s*(?:(?:\/\/|#|\/\*+|\*+)\s*)?Decision:\s*(\S*)/;
+  for (const file of ctx.repoFiles) { if (file.startsWith(".agents/") || /\.mdx?$/.test(file)) continue; const abs = join(ctx.root, file); try { if (!lstatSync(abs).isFile() || statSync(abs).size > 1_048_576) continue; const buf = readFileSync(abs); if (buf.subarray(0, 8192).includes(0)) continue; const text = buf.toString("utf8"), lines = text.split(/\r?\n/); lines.forEach((line, ix) => { const m = marker.exec(line); if (m) {
+      const raw = m[1], ref = raw.replace(/^\.{0,2}\//, "").replace(/^\.agents\/decisions\//, "");
+      if (!raw || !FILE_RE.test(ref)) {
+        out.push({ file, line: ix + 1, level: "error", code: "D112", message: `malformed Decision reference: ${raw || "(missing target)"}` });
+      } else {
+        const note = ctx.notes.get(ref);
+        if (!note) out.push({ file, line: ix + 1, level: "error", code: "D110", message: `Decision reference does not exist: ${ref}` });
+        else if (note.status === "superseded" || note.status === "rejected") out.push({ file, line: ix + 1, level: "warning", code: "D111", message: `Decision reference points to ${note.status} note: ${ref}` });
+      }
+    } }); } catch { /* transient/unreadable files are ignored */ } }
   return out;
 }
 function verifyStale(n: Note): Diagnostic[] { if (n.status !== "proposed" || !FILE_RE.test(n.file)) return []; const days = (Date.now() - +new Date(`${n.file.slice(0, 10)}T00:00:00Z`)) / 86_400_000; return days > 14 ? [diag(n, "D120", "warning", `proposed for ${Math.floor(days)} days; move to accepted/rejected or confirm it is deferred`)] : []; }
